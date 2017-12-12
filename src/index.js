@@ -1,13 +1,15 @@
 var path = require("path");
 var findRoot = require("find-root");
 var chalk = require("chalk");
+var fs = require("fs");
 var _ = require("lodash");
 
 const defaults = {
   verbose: false,
   showHelp: true,
   emitError: false,
-  exclude: null
+  exclude: null,
+  outputFile: null,
 };
 
 function DuplicatePackageCheckerPlugin(options) {
@@ -50,6 +52,7 @@ DuplicatePackageCheckerPlugin.prototype.apply = function(compiler) {
   let showHelp = this.options.showHelp;
   let emitError = this.options.emitError;
   let exclude = this.options.exclude;
+  let outputFile = this.options.outputFile;
 
   compiler.plugin("emit", function(compilation, callback) {
     let context = compilation.compiler.context;
@@ -94,16 +97,19 @@ DuplicatePackageCheckerPlugin.prototype.apply = function(compiler) {
         return module.version === version;
       });
 
-      if (!isSeen) {
-        let entry = { version, path: modulePath };
-
-        let issuer =
+      let issuer =
           module.issuer && module.issuer.resource
-            ? cleanPathRelativeToContext(module.issuer.resource)
-            : null;
-        entry.issuer = issuer;
+              ? cleanPathRelativeToContext(module.issuer.resource)
+              : null;
+
+      if (!isSeen) {
+        let entry = { version, path: [modulePath] };
+        entry.issuer = [issuer];
 
         modules[pkg.name].push(entry);
+      } else {
+        isSeen.path.push(modulePath);
+        isSeen.issuer.push(issuer);
       }
     });
 
@@ -128,6 +134,10 @@ DuplicatePackageCheckerPlugin.prototype.apply = function(compiler) {
 
     const duplicateCount = Object.keys(duplicates).length;
 
+    if (outputFile) {
+      fs.writeFileSync(outputFile, JSON.stringify(duplicates));
+    }
+
     if (duplicateCount) {
       let array = emitError ? compilation.errors : compilation.warnings;
 
@@ -140,9 +150,10 @@ DuplicatePackageCheckerPlugin.prototype.apply = function(compiler) {
           chalk.green.bold(name) +
           chalk.white(` found:\n`);
         instances = instances.map(version => {
-          let str = `${chalk.green.bold(version.version)} ${chalk.white.bold(
-            version.path
-          )}`;
+          let str = chalk.green.bold(version.version);
+          _.uniq(version.path).forEach(path => {
+            str += `\n      ${chalk.white.bold(path)}`;
+          });
           if (verbose && version.issuer) {
             str += ` from ${chalk.white.bold(version.issuer)}`;
           }
