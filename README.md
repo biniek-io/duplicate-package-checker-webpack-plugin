@@ -4,7 +4,7 @@
 
 Webpack plugin that warns you when multiple versions of the same package exist in a build.
 
-![duplicate-package-checker-webpack-plugin](https://cloud.githubusercontent.com/assets/729230/24270619/357ebc62-1016-11e7-9b04-f79fd5a72db7.png)
+![duplicate-package-checker-webpack-plugin](https://raw.githubusercontent.com/darrenscerri/duplicate-package-checker-webpack-plugin/master/screenshot.png)
 
 ## Why?
 
@@ -37,10 +37,12 @@ module.exports = {
 You can also pass an object with configurable options:
 ```js
 new DuplicatePackageCheckerPlugin({
-  // Also show module that is requiring each duplicate package
+  // Also show module that is requiring each duplicate package (default: false)
   verbose: true,
-  // Emit errors instead of warnings
+  // Emit errors instead of warnings (default: false)
   emitError: true,
+  // Show help message if duplicate packages are found (default: true)
+  showHelp: false,
   /**
    * Exclude instances of packages from the results.
    * If all instances of a package are excluded, or all instances except one,
@@ -57,6 +59,57 @@ new DuplicatePackageCheckerPlugin({
   }
 })
 ```
+
+## Resolving duplicate packages in your bundle
+
+There are multiple ways you can go about resolving duplicate packages in your bundle, the right solution mostly depends on what tools you're using and on each particular case.
+
+### Webpack `resolve.alias`
+
+Add an entry in [`resolve.alias`](https://webpack.github.io/docs/configuration.html#resolve-alias) which will configure Webpack to route any package references to a single specified path.
+
+For example, if Lodash is duplicated in your bundle, the following configuration would render all Lodash imports to always refer to the Lodash instance found at `./node_modules/lodash`.
+
+```
+alias: {
+  lodash: path.resolve(__dirname, 'node_modules/lodash'),
+}
+```
+
+**Note: Aliasing packages with different major versions may break your app. Use only if you're sure that all required versions are compatible, at least in the context of your app**
+
+### Yarn `install --flat`
+
+Yarn allows [flat installations](https://yarnpkg.com/lang/en/docs/cli/install/#toc-yarn-install-flat) (`yarn install --flat`) which will only allow one version of each package to be installed.
+
+### Yarn resolutions
+
+If you want more control over your overridden dependency versions and don't feel like using `yarn install --flat`, yarn supports ["selective version resolution"](https://yarnpkg.com/lang/en/docs/selective-version-resolutions) which allows you to enforce specific versions for each dependency.
+
+**package.json** 
+```
+{
+  "dependencies": {
+    "lodash": "4.17.0",
+    "old-package-with-old-lodash": "*"
+  },
+  "resolutions": {
+    "old-package-with-old-lodash/lodash": "4.17.0"
+  }
+}
+```
+
+### NPM Dedupe
+
+If you use NPM and not Yarn, you can try running `npm dedupe`. NPM **may** leave multiple versions of the same package installed even if a single version satisfies each [semver](https://docs.npmjs.com/getting-started/semantic-versioning) of all of its dependants.
+
+### Bump your dependencies
+
+If your project is using an old version of a package and a dependency is using a newer version of that package, consider upgrading your project to use the newer version.
+
+### File issues!
+
+If your project has a dependency and it's using an outdated version of a package, file an issue and notify the author to update the dependencies. Let's help keep our projects green and our applications secure, performant and bug-free!
 
 [downloads-image]: https://img.shields.io/npm/dt/duplicate-package-checker-webpack-plugin.svg
 [npm-url]: https://www.npmjs.com/package/duplicate-package-checker-webpack-plugin
